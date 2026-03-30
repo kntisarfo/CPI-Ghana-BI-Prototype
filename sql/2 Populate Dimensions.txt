@@ -1,0 +1,7 @@
+SELECT 'dim_indicator' AS table_name, COUNT(*) AS row_count FROM dim_indicator
+UNION ALL
+SELECT 'dim_category', COUNT(*) FROM dim_category
+UNION ALL
+SELECT 'dim_period', COUNT(*) FROM dim_period
+UNION ALL
+SELECT 'fact_cpi', COUNT(*) FROM fact_cpi;
