@@ -1,0 +1,33 @@
+-- Create staging table
+CREATE TABLE staging_cpi (
+    period_code    VARCHAR(7),
+    value          NUMERIC(10,2),
+    indicator_name VARCHAR(50),
+    category_name  VARCHAR(100)
+);
+
+-- Load CSVs into staging
+COPY staging_cpi (period_code, value, indicator_name, category_name)
+FROM 'C:\Cleaned_Data\CPI_clean.csv'
+WITH (FORMAT csv, HEADER true);
+
+COPY staging_cpi (period_code, value, indicator_name, category_name)
+FROM 'C:\Cleaned_Data\YoY_clean.csv'
+WITH (FORMAT csv, HEADER true);
+
+COPY staging_cpi (period_code, value, indicator_name, category_name)
+FROM 'C:\Cleaned_Data\MoM_clean.csv'
+WITH (FORMAT csv, HEADER true);
+
+-- Load fact_cpi from staging
+INSERT INTO fact_cpi (period_id, category_id, indicator_id, value, source)
+SELECT 
+    p.period_id,
+    c.category_id,
+    i.indicator_id,
+    s.value,
+    'GSS StatBank'
+FROM staging_cpi s
+JOIN dim_period    p ON p.period_code   = s.period_code
+JOIN dim_category  c ON c.category_name = s.category_name
+JOIN dim_indicator i ON i.indicator_name = s.indicator_name;
