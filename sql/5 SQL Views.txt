@@ -1,0 +1,114 @@
+-- ============================================================
+-- 05_views.sql — Analytics Layer Views
+-- CPI Ghana BI Prototype
+-- Kelvin Sarfo Nti | B01799377 | UWS MSc IT
+-- ============================================================
+
+
+-- ------------------------------------------------------------
+-- VIEW 1: vw_headline_cpi
+-- Headline CPI index values for "All products" across time
+-- Supports: Dashboard 1
+-- ------------------------------------------------------------
+CREATE OR REPLACE VIEW vw_headline_cpi AS
+SELECT
+    p.year,
+    p.month,
+    p.period_code,
+    f.value AS cpi_index
+FROM fact_cpi f
+JOIN dim_indicator  i ON f.indicator_id  = i.indicator_id
+JOIN dim_category   c ON f.category_id   = c.category_id
+JOIN dim_period     p ON f.period_id     = p.period_id
+WHERE i.indicator_name = 'Consumer Price Index'
+  AND c.category_name  = 'All products'
+ORDER BY p.period_id;
+
+
+-- ------------------------------------------------------------
+-- VIEW 2: vw_category_cpi
+-- CPI index values for each category across time
+-- Supports: Dashboard 2
+-- ------------------------------------------------------------
+CREATE OR REPLACE VIEW vw_category_cpi AS
+SELECT
+    p.year,
+    p.month,
+    p.period_code,
+    c.category_name,
+    f.value AS cpi_index
+FROM fact_cpi f
+JOIN dim_indicator  i ON f.indicator_id  = i.indicator_id
+JOIN dim_category   c ON f.category_id   = c.category_id
+JOIN dim_period     p ON f.period_id     = p.period_id
+WHERE i.indicator_name = 'Consumer Price Index'
+  AND c.category_name  <> 'All products'
+ORDER BY p.period_id, c.category_name;
+
+
+-- ------------------------------------------------------------
+-- VIEW 3: vw_inflation_rates
+-- Year-on-year and month-on-month inflation rates over time
+-- Supports: Dashboard 3
+-- ------------------------------------------------------------
+CREATE OR REPLACE VIEW vw_inflation_rates AS
+SELECT
+    p.year,
+    p.month,
+    p.period_code,
+    MAX(CASE WHEN i.indicator_name = 'Year-on-year inflation (%)'
+             THEN f.value END) AS yoy_inflation,
+    MAX(CASE WHEN i.indicator_name = 'Month-on-month inflation (%)'
+             THEN f.value END) AS mom_inflation
+FROM fact_cpi f
+JOIN dim_indicator  i ON f.indicator_id  = i.indicator_id
+JOIN dim_category   c ON f.category_id   = c.category_id
+JOIN dim_period     p ON f.period_id     = p.period_id
+WHERE c.category_name = 'All products'
+GROUP BY p.year, p.month, p.period_code, p.period_id
+ORDER BY p.period_id;
+
+
+-- ------------------------------------------------------------
+-- VIEW 4: vw_annual_summary
+-- Yearly average CPI and inflation rates — all products
+-- Supports: Dashboard 4, benchmarking, dissertation tables
+-- ------------------------------------------------------------
+CREATE OR REPLACE VIEW vw_annual_summary AS
+SELECT
+    p.year,
+    ROUND(AVG(CASE WHEN i.indicator_name = 'Consumer Price Index'
+                   AND c.category_name = 'All products'
+                   THEN f.value END)::numeric, 2) AS avg_cpi,
+    ROUND(AVG(CASE WHEN i.indicator_name = 'Year-on-year inflation (%)'
+                   AND c.category_name = 'All products'
+                   THEN f.value END)::numeric, 2) AS avg_yoy_inflation,
+    ROUND(AVG(CASE WHEN i.indicator_name = 'Month-on-month inflation (%)'
+                   AND c.category_name = 'All products'
+                   THEN f.value END)::numeric, 2) AS avg_mom_inflation
+FROM fact_cpi f
+JOIN dim_indicator  i ON f.indicator_id  = i.indicator_id
+JOIN dim_category   c ON f.category_id   = c.category_id
+JOIN dim_period     p ON f.period_id     = p.period_id
+GROUP BY p.year
+ORDER BY p.year;
+
+
+-- ------------------------------------------------------------
+-- VIEW 5: vw_category_annual_avg
+-- Yearly average CPI per category — for trend comparison
+-- Supports: Dashboard 4 (Trend Explorer), benchmarking
+-- ------------------------------------------------------------
+CREATE OR REPLACE VIEW vw_category_annual_avg AS
+SELECT
+    p.year,
+    c.category_name,
+    ROUND(AVG(f.value)::numeric, 2) AS avg_cpi_index
+FROM fact_cpi f
+JOIN dim_indicator  i ON f.indicator_id  = i.indicator_id
+JOIN dim_category   c ON f.category_id   = c.category_id
+JOIN dim_period     p ON f.period_id     = p.period_id
+WHERE i.indicator_name = 'Consumer Price Index'
+  AND c.category_name  <> 'All products'
+GROUP BY p.year, c.category_name
+ORDER BY p.year, c.category_name;
